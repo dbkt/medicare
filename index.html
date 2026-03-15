@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediCheck KI – Keine Regresse mehr. Automatisierte Tageslisten-Prüfung.</title>
+  <meta name="description" content="KI-gestützte Prüfung Ihrer Tagesliste. EBM-Fehler erkennen, Regresse vermeiden, DSGVO-konform. On-Premise-Lösung für Arztpraxen und MVZ." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:       #0d1f3c;
+      --navy-mid:   #162847;
+      --navy-light: #1e3a5f;
+      --teal:       #1a6b6b;
+      --teal-light: #22857e;
+      --amber:      #d97b2c;
+      --amber-light:#e8943d;
+      --white:      #f8fafc;
+      --off-white:  #eef2f7;
+      --text:       #1e2d40;
+      --text-muted: #5a7291;
+      --border:     #d0dae8;
+      --success:    #1a7a4a;
+      --error:      #c0392b;
+      --radius:     12px;
+      --radius-lg:  20px;
+      --shadow-sm:  0 2px 8px rgba(13,31,60,.08);
+      --shadow-md:  0 6px 24px rgba(13,31,60,.13);
+      --shadow-lg:  0 16px 48px rgba(13,31,60,.18);
+      --transition: .28s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--white);
+      color: var(--text);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── UTILITY ── */
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .section { padding: 96px 0; }
+    .section--dark { background: var(--navy); color: var(--white); }
+    .section--mid  { background: var(--navy-mid); color: var(--white); }
+    .section--tint { background: var(--off-white); }
+
+    .tag {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--teal-light);
+      background: rgba(26,107,107,.1);
+      border: 1px solid rgba(26,107,107,.25);
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    .section--dark .tag, .section--mid .tag {
+      color: #6dd5ca;
+      background: rgba(109,213,202,.1);
+      border-color: rgba(109,213,202,.25);
+    }
+
+    h1,h2,h3 { font-family: 'Syne', sans-serif; line-height: 1.15; }
+    h2 { font-size: clamp(1.75rem, 3vw, 2.5rem); margin-bottom: 16px; }
+    h3 { font-size: 1.15rem; margin-bottom: 8px; }
+
+    .lead {
+      font-size: clamp(1rem, 1.5vw, 1.125rem);
+      color: var(--text-muted);
+      max-width: 620px;
+      margin-bottom: 48px;
+    }
+    .section--dark .lead, .section--mid .lead { color: rgba(248,250,252,.65); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      font-size: .95rem;
+      cursor: pointer;
+      text-decoration: none;
+      border: none;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+    .btn--primary {
+      background: linear-gradient(135deg, var(--amber), var(--amber-light));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(217,123,44,.35);
+    }
+    .btn--primary:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(217,123,44,.45); }
+    .btn--outline {
+      background: transparent;
+      color: var(--white);
+      border: 1.5px solid rgba(255,255,255,.4);
+    }
+    .btn--outline:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.7); }
+    .btn--teal {
+      background: linear-gradient(135deg, var(--teal), var(--teal-light));
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(26,107,107,.3);
+    }
+    .btn--teal:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(26,107,107,.4); }
+
+    /* ── ANIMATION BASE ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity .65s ease, transform .65s ease;
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+    .reveal-delay-1 { transition-delay: .1s; }
+    .reveal-delay-2 { transition-delay: .2s; }
+    .reveal-delay-3 { transition-delay: .3s; }
+    .reveal-delay-4 { transition-delay: .4s; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(13,31,60,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,.07);
+      transition: background var(--transition);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--white);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--teal), var(--teal-light));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-icon svg { width: 18px; height: 18px; fill: #fff; }
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: rgba(248,250,252,.72);
+      text-decoration: none;
+      font-size: .88rem;
+      font-weight: 500;
+      transition: color var(--transition);
+    }
+    .nav-links a:hover { color: var(--white); }
+    .nav-cta { display: flex; align-items: center; }
+    .nav-cta .btn { padding: 9px 20px; font-size: .85rem; }
+
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .hamburger span {
+      display: block;
+      width: 24px; height: 2px;
+      background: var(--white);
+      border-radius: 2px;
+      transition: var(--transition);
+    }
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 64px; left: 0; right: 0;
+      background: var(--navy);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      padding: 24px;
+      z-index: 99;
+    }
+    .mobile-menu.open { display: block; }
+    .mobile-menu ul { list-style: none; }
+    .mobile-menu ul li { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .mobile-menu ul li:last-child { border: none; }
+    .mobile-menu a { color: var(--white); text-decoration: none; font-weight: 500; }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      background: linear-gradient(160deg, var(--navy) 0%, #0b2240 55%, #112a4a 100%);
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      padding-top: 64px;
+    }
+    .hero-bg-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+    .hero-bg-glow {
+      position: absolute;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(26,107,107,.22) 0%, transparent 70%);
+      top: -100px; right: -100px;
+      pointer-events: none;
+    }
+    .hero-bg-glow-2 {
+      position: absolute;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(217,123,44,.12) 0%, transparent 70%);
+      bottom: 50px; left: -80px;
+      pointer-events: none;
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 80px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+    .hero-text h1 {
+      font-size: clamp(2.2rem, 5vw, 3.5rem);
+      color: var(--white);
+      margin-bottom: 24px;
+      line-height: 1.1;
+    }
+    .hero-text h1 em {
+      font-style: normal;
+      background: linear-gradient(90deg, #6dd5ca, var(--amber-light));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 1.5vw, 1.15rem);
+      color: rgba(248,250,252,.72);
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+    .hero-ctas { display: flex; gap: 16px; flex-wrap: wrap; }
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 40px;
+    }
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: .78rem;
+      color: rgba(248,250,252,.8);
+      font-weight: 500;
+    }
+    .badge-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 6px rgba(74,222,128,.6);
+      flex-shrink: 0;
+    }
+
+    /* hero visual */
+    .hero-visual {
+      display: flex;
+      justify-content: center;
+    }
+    .dashboard-mock {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.08);
+      backdrop-filter: blur(8px);
+    }
+    .mock-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .mock-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .mock-dot:nth-child(1) { background: #ff5f57; }
+    .mock-dot:nth-child(2) { background: #febc2e; }
+    .mock-dot:nth-child(3) { background: #28c840; }
+    .mock-title {
+      font-size: .75rem;
+      color: rgba(255,255,255,.4);
+      margin-left: 8px;
+      font-weight: 500;
+    }
+    .mock-header {
+      background: rgba(26,107,107,.2);
+      border: 1px solid rgba(26,107,107,.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .mock-header-text {
+      font-size: .8rem;
+      font-weight: 600;
+      color: #6dd5ca;
+    }
+    .mock-status {
+      font-size: .72rem;
+      background: rgba(74,222,128,.15);
+      color: #4ade80;
+      border: 1px solid rgba(74,222,128,.3);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-weight: 600;
+    }
+    .mock-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: .8rem;
+      transition: background var(--transition);
+    }
+    .mock-row:hover { background: rgba(255,255,255,.04); }
+    .mock-row-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: .9rem;
+    }
+    .mock-row-icon.ok   { background: rgba(74,222,128,.15); color: #4ade80; }
+    .mock-row-icon.warn { background: rgba(251,191,36,.15); color: #fbbf24; }
+    .mock-row-icon.err  { background: rgba(239,68,68,.15); color: #ef4444; }
+    .mock-row-content { flex: 1; }
+    .mock-row-title { color: rgba(255,255,255,.85); font-weight: 500; margin-bottom: 2px; }
+    .mock-row-sub { color: rgba(255,255,255,.4); font-size: .72rem; }
+    .mock-row-badge {
+      font-size: .68rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .mock-row-badge.ok   { background: rgba(74,222,128,.15); color: #4ade80; border: 1px solid rgba(74,222,128,.25); }
+    .mock-row-badge.warn { background: rgba(251,191,36,.15); color: #fbbf24; border: 1px solid rgba(251,191,36,.25); }
+    .mock-row-badge.err  { background: rgba(239,68,68,.15); color: #ef4444; border: 1px solid rgba(239,68,68,.25); }
+    .mock-footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,.07);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mock-stat { text-align: center; }
+    .mock-stat-val { font-size: 1.1rem; font-weight: 700; color: var(--white); font-family: 'Syne', sans-serif; }
+    .mock-stat-label { font-size: .68rem; color: rgba(255,255,255,.4); }
+    .mock-pulse {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .72rem;
+      color: #4ade80;
+    }
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      animation: pulse-anim 2s infinite;
+    }
+    @keyframes pulse-anim {
+      0%,100% { box-shadow: 0 0 0 0 rgba(74,222,128,.5); }
+      50%      { box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+    }
+
+    /* ── PROBLEM ── */
+    #problem { background: var(--off-white); }
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      margin-top: 48px;
+    }
+    .problem-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .problem-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .problem-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--amber), var(--amber-light));
+    }
+    .problem-icon {
+      width: 52px; height: 52px;
+      background: rgba(217,123,44,.1);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+    }
+    .problem-card h3 { font-size: 1.05rem; margin-bottom: 10px; color: var(--navy); }
+    .problem-card p { font-size: .9rem; color: var(--text-muted); line-height: 1.7; }
+    .problem-highlight {
+      display: inline-block;
+      font-weight: 700;
+      color: var(--amber);
+      margin-top: 12px;
+      font-size: .9rem;
+    }
+
+    /* ── HOW IT WORKS ── */
+    #solution { background: var(--navy); }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      margin-top: 56px;
+      position: relative;
+    }
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      left: calc(16.6% + 20px);
+      right: calc(16.6% + 20px);
+      height: 2px;
+      background: linear-gradient(90deg, var(--teal), var(--teal-light), var(--amber));
+      opacity: .4;
+    }
+    .step {
+      text-align: center;
+      padding: 32px 24px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: var(--radius-lg);
+      transition: background var(--transition), border-color var(--transition), transform var(--transition);
+    }
+    .step:hover {
+      background: rgba(255,255,255,.06);
+      border-color: rgba(109,213,202,.3);
+      transform: translateY(-4px);
+    }
+    .step-num {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--teal), var(--teal-light));
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 4px 20px rgba(26,107,107,.4);
+    }
+    .step h3 { color: var(--white); font-size: 1.05rem; margin-bottom: 10px; }
+    .step p { font-size: .88rem; color: rgba(248,250,252,.6); line-height: 1.7; }
+    .step-tag {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: .72rem;
+      font-weight: 600;
+      color: #6dd5ca;
+      background: rgba(109,213,202,.1);
+      border: 1px solid rgba(109,213,202,.2);
+      border-radius: 999px;
+      padding: 3px 10px;
+    }
+
+    /* ── COMPATIBILITY ── */
+    #compatibility { background: var(--white); }
+    .pvs-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 48px;
+    }
+    .pvs-card {
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+      text-align: center;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      cursor: default;
+      background: var(--white);
+    }
+    .pvs-card:hover {
+      border-color: var(--teal-light);
+      box-shadow: 0 4px 20px rgba(26,107,107,.12);
+      transform: translateY(-3px);
+    }
+    .pvs-logo {
+      width: 40px; height: 40px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--navy-light), var(--navy));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      font-size: .65rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+    }
+    .pvs-name { font-weight: 600; font-size: .85rem; color: var(--navy); }
+    .pvs-sub  { font-size: .72rem; color: var(--text-muted); margin-top: 3px; }
+    .compat-note {
+      margin-top: 32px;
+      background: var(--off-white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .compat-note p { font-size: .9rem; color: var(--text-muted); }
+    .compat-note strong { color: var(--navy); }
+
+    /* ── BENEFITS ── */
+    #benefits { background: var(--off-white); }
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      margin-top: 48px;
+    }
+    .benefit-card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      display: flex;
+      gap: 20px;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+    .benefit-card:hover {
+      border-color: var(--teal-light);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+    .benefit-icon {
+      width: 52px; height: 52px;
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--teal), var(--teal-light));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(26,107,107,.25);
+    }
+    .benefit-text h3 { color: var(--navy); margin-bottom: 6px; }
+    .benefit-text p  { font-size: .88rem; color: var(--text-muted); line-height: 1.7; }
+    .benefit-highlight {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--teal);
+      margin-top: 10px;
+      display: block;
+    }
+
+    /* ── HOSPITALS ── */
+    #hospitals { background: var(--navy-mid); }
+    .hospital-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+    .hospital-text h2 { color: var(--white); }
+    .hospital-text p  { color: rgba(248,250,252,.7); margin-bottom: 32px; font-size: .95rem; line-height: 1.8; }
+    .hospital-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 36px;
+    }
+    .hospital-list li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .9rem;
+      color: rgba(248,250,252,.8);
+    }
+    .hospital-list li::before {
+      content: '✓';
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(109,213,202,.15);
+      border: 1px solid rgba(109,213,202,.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      color: #6dd5ca;
+      flex-shrink: 0;
+    }
+    .hospital-visual {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+    .stat-box {
+      flex: 1;
+      text-align: center;
+      background: rgba(255,255,255,.04);
+      border-radius: var(--radius);
+      padding: 20px 16px;
+    }
+    .stat-box-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--white);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-box-val span { color: var(--amber); }
+    .stat-box-label { font-size: .75rem; color: rgba(255,255,255,.45); }
+    .kis-compat {
+      background: rgba(26,107,107,.15);
+      border: 1px solid rgba(109,213,202,.2);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: .85rem;
+      color: rgba(248,250,252,.75);
+      line-height: 1.6;
+    }
+    .kis-compat strong { color: #6dd5ca; }
+
+    /* ── CONTACT ── */
+    #contact { background: var(--white); }
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 80px;
+      align-items: start;
+    }
+    .contact-info h2 { color: var(--navy); margin-bottom: 16px; }
+    .contact-info p  { color: var(--text-muted); line-height: 1.8; margin-bottom: 32px; }
+    .contact-points {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .contact-points li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: .88rem;
+      color: var(--text-muted);
+    }
+    .contact-points li .cp-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: rgba(26,107,107,.08);
+      border: 1px solid rgba(26,107,107,.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+      margin-top: -2px;
+    }
+    .contact-points strong { color: var(--navy); display: block; margin-bottom: 2px; }
+
+    /* form */
+    .form-card {
+      background: var(--off-white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 40px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .form-group:last-child { margin-bottom: 0; }
+    label {
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--navy);
+    }
+    label .req { color: var(--amber); margin-left: 2px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .9rem;
+      font-family: inherit;
+      background: var(--white);
+      color: var(--text);
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--teal-light);
+      box-shadow: 0 0 0 3px rgba(26,107,107,.12);
+    }
+    input.error, select.error, textarea.error {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(192,57,43,.1);
+    }
+    .field-error {
+      font-size: .75rem;
+      color: var(--error);
+      display: none;
+    }
+    .field-error.visible { display: block; }
+    textarea { resize: vertical; min-height: 100px; }
+    select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a7291' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px; }
+    .checkbox-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .checkbox-group input[type="checkbox"] {
+      width: 18px; height: 18px;
+      flex-shrink: 0;
+      accent-color: var(--teal);
+      margin-top: 1px;
+      cursor: pointer;
+    }
+    .checkbox-label {
+      font-size: .82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .checkbox-label a { color: var(--teal); text-decoration: underline; }
+    .form-submit { width: 100%; padding: 16px; font-size: 1rem; justify-content: center; margin-top: 8px; }
+
+    /* success */
+    .form-success {
+      display: none;
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .form-success.visible { display: block; }
+    .success-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #22c55e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 2rem;
+      box-shadow: 0 8px 32px rgba(26,122,74,.3);
+    }
+    .form-success h3 { color: var(--navy); margin-bottom: 12px; font-size: 1.35rem; }
+    .form-success p  { color: var(--text-muted); line-height: 1.7; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--navy);
+      border-top: 1px solid rgba(255,255,255,.07);
+      padding: 40px 0;
+    }
+    .footer-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .footer-logo { color: var(--white); font-size: 1rem; }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+    .footer-links a {
+      font-size: .85rem;
+      color: rgba(248,250,252,.5);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    .footer-links a:hover { color: var(--white); }
+    .footer-copy {
+      font-size: .8rem;
+      color: rgba(248,250,252,.35);
+    }
+
+    /* ── TRUST BAR ── */
+    .trust-bar {
+      background: var(--navy-light);
+      border-top: 1px solid rgba(255,255,255,.06);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      padding: 16px 0;
+    }
+    .trust-bar-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 48px;
+      flex-wrap: wrap;
+    }
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .78rem;
+      color: rgba(248,250,252,.6);
+      font-weight: 500;
+    }
+    .trust-item-icon { font-size: 1rem; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 960px) {
+      .hero-content { grid-template-columns: 1fr; gap: 48px; padding: 64px 24px; }
+      .hero-visual { display: none; }
+      .problem-grid { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .steps::before { display: none; }
+      .pvs-grid { grid-template-columns: repeat(2, 1fr); }
+      .benefits-grid { grid-template-columns: 1fr; }
+      .hospital-inner { grid-template-columns: 1fr; gap: 40px; }
+      .contact-grid { grid-template-columns: 1fr; gap: 40px; }
+      .form-row { grid-template-columns: 1fr; }
+      .nav-links, .nav-cta { display: none; }
+      .hamburger { display: flex; }
+    }
+    @media (max-width: 480px) {
+      .section { padding: 64px 0; }
+      .pvs-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .form-card { padding: 24px 20px; }
+      h2 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav id="navbar">
+  <div class="nav-inner">
+    <a href="#hero" class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2zm-1 13.5v-3H8.5V10h2.5V7.5h3V10H16.5v2.5H14v3h-3z"/>
+        </svg>
+      </div>
+      MediCheck<span style="color:var(--amber);">KI</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#problem">Problem</a></li>
+      <li><a href="#solution">So funktioniert's</a></li>
+      <li><a href="#compatibility">Kompatibilität</a></li>
+      <li><a href="#benefits">Vorteile</a></li>
+      <li><a href="#contact">Kontakt</a></li>
+    </ul>
+    <div class="nav-cta">
+      <a href="#contact" class="btn btn--primary">Erstgespräch anfragen</a>
+    </div>
+    <div class="hamburger" id="hamburger" aria-label="Menü" role="button" tabindex="0">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <ul>
+    <li><a href="#problem" class="mobile-link">Das Problem</a></li>
+    <li><a href="#solution" class="mobile-link">So funktioniert's</a></li>
+    <li><a href="#compatibility" class="mobile-link">Kompatibilität</a></li>
+    <li><a href="#benefits" class="mobile-link">Vorteile</a></li>
+    <li><a href="#hospitals" class="mobile-link">Krankenhäuser</a></li>
+    <li><a href="#contact" class="mobile-link">Kontakt & Erstgespräch</a></li>
+  </ul>
+</div>
+
+<!-- ── HERO ── -->
+<section id="hero">
+  <div class="hero-bg-grid"></div>
+  <div class="hero-bg-glow"></div>
+  <div class="hero-bg-glow-2"></div>
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="tag">KI-gestützte Abrechnungsprüfung</div>
+      <h1>Kein Regress mehr.<br /><em>Ihre Tagesliste,</em><br />automatisch geprüft.</h1>
+      <p class="hero-sub">
+        Unsere KI analysiert täglich Ihre EBM-Ziffern, ICD-Diagnosen und Zeitbudgets –
+        direkt in Ihrer Praxis, DSGVO-konform. Fehler werden erkannt, bevor sie zur
+        Kassenärztlichen Vereinigung gelangen.
+      </p>
+      <div class="hero-ctas">
+        <a href="#contact" class="btn btn--primary">Kostenloses Erstgespräch&nbsp;→</a>
+        <a href="#solution" class="btn btn--outline">So funktioniert's</a>
+      </div>
+      <div class="hero-badges">
+        <div class="badge"><div class="badge-dot"></div>On-Premise – Daten verlassen Ihre Praxis nie</div>
+        <div class="badge"><div class="badge-dot"></div>DSGVO-konform</div>
+        <div class="badge"><div class="badge-dot"></div>Keine IT-Kenntnisse nötig</div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="dashboard-mock">
+        <div class="mock-bar">
+          <div class="mock-dot"></div>
+          <div class="mock-dot"></div>
+          <div class="mock-dot"></div>
+          <span class="mock-title">MediCheckKI – Tagesliste 15.03.2026</span>
+        </div>
+        <div class="mock-header">
+          <div class="mock-header-text">KI-Prüfung läuft&hellip;</div>
+          <div class="mock-status">Aktiv</div>
+        </div>
+        <div class="mock-row">
+          <div class="mock-row-icon ok">✓</div>
+          <div class="mock-row-content">
+            <div class="mock-row-title">EBM 03000 – Ordinationskomp.</div>
+            <div class="mock-row-sub">ICD: J06.9 · Plausibilität: OK</div>
+          </div>
+          <span class="mock-row-badge ok">Geprüft</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-row-icon warn">!</div>
+          <div class="mock-row-content">
+            <div class="mock-row-title">EBM 13500 – Lungenfunktion</div>
+            <div class="mock-row-sub">Zeitbudget: 87% ausgeschöpft</div>
+          </div>
+          <span class="mock-row-badge warn">Prüfen</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-row-icon err">✗</div>
+          <div class="mock-row-content">
+            <div class="mock-row-title">EBM 01600 – Bericht fehlt</div>
+            <div class="mock-row-sub">Pflichtdokumentation unvollständig</div>
+          </div>
+          <span class="mock-row-badge err">Korrigieren</span>
+        </div>
+        <div class="mock-row">
+          <div class="mock-row-icon ok">✓</div>
+          <div class="mock-row-content">
+            <div class="mock-row-title">EBM 35100 – Psychosomatik</div>
+            <div class="mock-row-sub">ICD: F32.1 · Ziffer korrekt</div>
+          </div>
+          <span class="mock-row-badge ok">Geprüft</span>
+        </div>
+        <div class="mock-footer">
+          <div class="mock-stat">
+            <div class="mock-stat-val">34</div>
+            <div class="mock-stat-label">Fälle heute</div>
+          </div>
+          <div class="mock-stat">
+            <div class="mock-stat-val">32</div>
+            <div class="mock-stat-label">Korrekt</div>
+          </div>
+          <div class="mock-stat">
+            <div class="mock-stat-val" style="color:var(--amber);">2</div>
+            <div class="mock-stat-label">Handlung nötig</div>
+          </div>
+          <div class="mock-pulse">
+            <div class="pulse-dot"></div>Live
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TRUST BAR ── -->
+<div class="trust-bar">
+  <div class="trust-bar-inner">
+    <div class="trust-item"><span class="trust-item-icon">🏥</span>Für Einzel- und Gemeinschaftspraxen</div>
+    <div class="trust-item"><span class="trust-item-icon">🔒</span>Zertifizierte On-Premise-Lösung</div>
+    <div class="trust-item"><span class="trust-item-icon">⚡</span>Integration in &lt; 1 Tag</div>
+    <div class="trust-item"><span class="trust-item-icon">📍</span>Frankfurt am Main & deutschlandweit</div>
+  </div>
+</div>
+
+<!-- ── PROBLEM ── -->
+<section id="problem" class="section section--tint">
+  <div class="container">
+    <div class="tag reveal">Das Problem</div>
+    <h2 class="reveal reveal-delay-1">Das kostet Sie bares Geld</h2>
+    <p class="lead reveal reveal-delay-2">
+      Fehler in der Tagesliste sind keine Seltenheit – und ihre Folgen oft gravierend.
+      Krankenkassen und KV prüfen jede Abrechnung penibel.
+    </p>
+    <div class="problem-grid">
+      <div class="problem-card reveal">
+        <div class="problem-icon">⚠️</div>
+        <h3>Regress-Risiko</h3>
+        <p>
+          Die Krankenkassen prüfen jede eingereichte Abrechnung. Fehlerhafte EBM-Ziffern,
+          falsche ICD-Codes oder nicht plausible Leistungen führen zu
+          Rückforderungen – oft erst Monate später, wenn eine Korrektur kaum möglich ist.
+        </p>
+        <span class="problem-highlight">Regresse: oft 5.000 – 50.000 € pro Quartal</span>
+      </div>
+      <div class="problem-card reveal reveal-delay-1">
+        <div class="problem-icon">⏱️</div>
+        <h3>Täglicher Zeitverlust</h3>
+        <p>
+          Medizinische Fachangestellte verbringen jeden Tag Stunden damit,
+          die Tagesliste manuell durchzusehen, Ziffern nachzuschlagen und
+          Plausibilitäten zu prüfen. Zeit, die für die Patientenversorgung fehlt.
+        </p>
+        <span class="problem-highlight">Bis zu 2–3 Stunden täglich – pro MFA</span>
+      </div>
+      <div class="problem-card reveal reveal-delay-2">
+        <div class="problem-icon">👥</div>
+        <h3>Fachkräftemangel</h3>
+        <p>
+          Weniger qualifiziertes Personal, gleich viel Dokumentation.
+          Das Risiko steigt, dass Fehler unentdeckt bleiben. Die KV zeigt
+          dabei keine Gnade: Was falsch abgerechnet wird, wird zurückgefordert.
+        </p>
+        <span class="problem-highlight">Dokumentationslast wächst, Team schrumpft</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SOLUTION ── -->
+<section id="solution" class="section section--dark">
+  <div class="container">
+    <div class="tag reveal">So funktioniert's</div>
+    <h2 class="reveal reveal-delay-1" style="color:var(--white);">Drei Schritte. Keine IT-Expertise nötig.</h2>
+    <p class="lead reveal reveal-delay-2">
+      MediCheckKI läuft vollständig On-Premise in Ihrer Praxis.
+      Keine Cloud, keine Datenweitergabe, keine Umstellung Ihrer gewohnten Abläufe.
+    </p>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">1</div>
+        <h3>Tagesliste einlesen</h3>
+        <p>
+          Die KI liest Ihre Tagesliste direkt aus dem Praxisverwaltungssystem aus –
+          vollautomatisch, sobald sie generiert wird. Unterstützt alle gängigen PVS.
+        </p>
+        <span class="step-tag">On-Premise · Sicher · Automatisch</span>
+      </div>
+      <div class="step reveal reveal-delay-1">
+        <div class="step-num">2</div>
+        <h3>KI-Prüfung in Echtzeit</h3>
+        <p>
+          Automatische Analyse aller EBM-Ziffern, ICD-10-Diagnosen,
+          Zeitbudgets (max. 12h/Tag, 780h/Quartal) und Pflichtdokumentation
+          auf Basis aktueller KV-Richtlinien.
+        </p>
+        <span class="step-tag">EBM · ICD-10 · Zeitbudgets · Plausibilität</span>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <div class="step-num">3</div>
+        <h3>Bestätigen oder korrigieren</h3>
+        <p>
+          Auffälligkeiten werden übersichtlich im Web-Interface angezeigt.
+          Der Arzt oder die MFA bestätigt korrekte Fälle oder korrigiert
+          Fehler – in unter 60 Sekunden.
+        </p>
+        <span class="step-tag">Einfaches Web-Interface · Kein Schulungsaufwand</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── COMPATIBILITY ── -->
+<section id="compatibility" class="section">
+  <div class="container">
+    <div class="tag reveal">Kompatibilität</div>
+    <h2 class="reveal reveal-delay-1">Kompatibel mit Ihrer Praxissoftware</h2>
+    <p class="lead reveal reveal-delay-2">
+      MediCheckKI integriert sich nahtlos in die gängigsten Praxisverwaltungssysteme
+      Deutschlands – ohne Systemwechsel, ohne Datenmigration.
+    </p>
+    <div class="pvs-grid">
+      <div class="pvs-card reveal">
+        <div class="pvs-logo">CGM</div>
+        <div class="pvs-name">CGM Albis</div>
+        <div class="pvs-sub">CompuGroup Medical</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-1">
+        <div class="pvs-logo" style="font-size:.55rem;">MED</div>
+        <div class="pvs-name">CGM Medistar</div>
+        <div class="pvs-sub">Marktführer nach Installationszahl</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-2">
+        <div class="pvs-logo">mtx</div>
+        <div class="pvs-name">Medatixx</div>
+        <div class="pvs-sub">Stark im Mittelfeld</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-3">
+        <div class="pvs-logo">TOM</div>
+        <div class="pvs-name">Tomedo</div>
+        <div class="pvs-sub">Zollsoft · Modern & wachsend</div>
+      </div>
+      <div class="pvs-card reveal">
+        <div class="pvs-logo">M1</div>
+        <div class="pvs-name">M1 Pro</div>
+        <div class="pvs-sub">CGM · Fachärzte</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-1">
+        <div class="pvs-logo">TB</div>
+        <div class="pvs-name">turbomed</div>
+        <div class="pvs-sub">CGM</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-2">
+        <div class="pvs-logo">iS</div>
+        <div class="pvs-name">inSuite</div>
+        <div class="pvs-sub">Doc Cirrus · Cloudbasiert</div>
+      </div>
+      <div class="pvs-card reveal reveal-delay-3">
+        <div class="pvs-logo">MO</div>
+        <div class="pvs-name">Medical Office</div>
+        <div class="pvs-sub">Weit verbreitet</div>
+      </div>
+    </div>
+    <div class="compat-note reveal">
+      <p><strong>Ihr PVS nicht dabei?</strong> Kein Problem. Wir integrieren auch weitere Systeme auf Anfrage.</p>
+      <a href="#contact" class="btn btn--teal">Integration anfragen</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── BENEFITS ── -->
+<section id="benefits" class="section section--tint">
+  <div class="container">
+    <div class="tag reveal">Was Sie gewinnen</div>
+    <h2 class="reveal reveal-delay-1">Konkrete Vorteile für Ihre Praxis</h2>
+    <p class="lead reveal reveal-delay-2">
+      Weniger Fehler, weniger Stress, mehr Zeit für das Wesentliche: Ihre Patienten.
+    </p>
+    <div class="benefits-grid">
+      <div class="benefit-card reveal">
+        <div class="benefit-icon">🛡️</div>
+        <div class="benefit-text">
+          <h3>Bis zu 100% weniger Regressrisiko</h3>
+          <p>
+            Automatisierte EBM-Prüfung nach aktuellen KV-Richtlinien erkennt
+            Fehler, bevor die Abrechnung eingereicht wird. Keine bösen Überraschungen
+            im nächsten Quartal.
+          </p>
+          <span class="benefit-highlight">→ Fehler erkennen, bevor sie Geld kosten</span>
+        </div>
+      </div>
+      <div class="benefit-card reveal reveal-delay-1">
+        <div class="benefit-icon">🔒</div>
+        <div class="benefit-text">
+          <h3>DSGVO-konform & On-Premise</h3>
+          <p>
+            Patientendaten verlassen Ihre Praxis zu keinem Zeitpunkt.
+            Die KI läuft vollständig auf Ihrer eigenen Hardware –
+            keine Cloud, kein Datentransfer, kein Datenschutzrisiko.
+          </p>
+          <span class="benefit-highlight">→ Vollständige Datensouveränität in Ihrer Hand</span>
+        </div>
+      </div>
+      <div class="benefit-card reveal reveal-delay-2">
+        <div class="benefit-icon">⚡</div>
+        <div class="benefit-text">
+          <h3>Bestätigen in unter 60 Sekunden</h3>
+          <p>
+            Das übersichtliche Web-Interface zeigt Ihnen nur das,
+            was Aufmerksamkeit braucht. Korrekte Fälle werden automatisch
+            durchgeleitet – Sie kümmern sich nur um Auffälligkeiten.
+          </p>
+          <span class="benefit-highlight">→ Mehr Fokus auf Patienten statt Bürokratie</span>
+        </div>
+      </div>
+      <div class="benefit-card reveal reveal-delay-3">
+        <div class="benefit-icon">🔗</div>
+        <div class="benefit-text">
+          <h3>Nahtlose PVS-Integration</h3>
+          <p>
+            Kein Systemwechsel, keine Schulungswochen, kein IT-Projekt.
+            Die Integration erfolgt in weniger als einem Tag und läuft
+            im Hintergrund – unsichtbar und zuverlässig.
+          </p>
+          <span class="benefit-highlight">→ Integration in &lt; 1 Tag, live in Stunden</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOSPITALS ── -->
+<section id="hospitals" class="section section--mid">
+  <div class="container">
+    <div class="hospital-inner">
+      <div class="hospital-text">
+        <div class="tag">Für Kliniken &amp; MVZ</div>
+        <h2>Auch für Krankenhäuser und Klinikverbünde</h2>
+        <p>
+          Die MediCheckKI-Plattform lässt sich nicht nur in Arztpraxen einsetzen.
+          Krankenhäuser und medizinische Versorgungszentren profitieren von
+          einer skalierbaren Integration in bestehende Krankenhaus-Informationssysteme (KIS).
+        </p>
+        <ul class="hospital-list">
+          <li>Integration in gängige KIS-Systeme auf Anfrage</li>
+          <li>Skalierbar für große Fallzahlen und mehrere Stationen</li>
+          <li>Zentrale Übersicht für Verwaltung und Abrechnungsabteilung</li>
+          <li>Individuelle Konfiguration je nach Fachrichtung</li>
+        </ul>
+        <a href="#contact" class="btn btn--primary">Kliniklösung anfragen&nbsp;→</a>
+      </div>
+      <div class="hospital-visual">
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-box-val"><span>↓</span>94%</div>
+            <div class="stat-box-label">Weniger manuelle Prüfaufwände</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-val"><span>0</span>€</div>
+            <div class="stat-box-label">Unentdeckte Regresse</div>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-box">
+            <div class="stat-box-val"><span>&lt;</span>1d</div>
+            <div class="stat-box-label">Integrationszeit</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-val">24/7</div>
+            <div class="stat-box-label">Automatische Prüfung</div>
+          </div>
+        </div>
+        <div class="kis-compat">
+          <strong>KIS-Kompatibilität:</strong> Wir integrieren uns in Ihre bestehende
+          Infrastruktur. Sprechen Sie uns auf Ihre spezifische IT-Umgebung an –
+          wir erstellen ein individuelles Integrationskonzept.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CONTACT ── -->
+<section id="contact" class="section">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="contact-info">
+        <div class="tag reveal">Kostenloses Erstgespräch</div>
+        <h2 class="reveal reveal-delay-1">Überzeugen Sie sich selbst.</h2>
+        <p class="reveal reveal-delay-2">
+          In einem unverbindlichen Gespräch zeigen wir Ihnen, wie MediCheckKI
+          in Ihre konkrete Praxisumgebung passt – und welche Fehler wir in
+          einer Demo-Prüfung Ihrer Tagesliste finden.
+        </p>
+        <ul class="contact-points reveal reveal-delay-3">
+          <li>
+            <div class="cp-icon">📍</div>
+            <div>
+              <strong>Standort</strong>
+              Frankfurt am Main – persönlich oder per Video
+            </div>
+          </li>
+          <li>
+            <div class="cp-icon">⏱️</div>
+            <div>
+              <strong>Dauer</strong>
+              30–45 Minuten, kein Verkaufsdruck
+            </div>
+          </li>
+          <li>
+            <div class="cp-icon">🎯</div>
+            <div>
+              <strong>Was Sie mitnehmen</strong>
+              Konkrete Einschätzung, ob und wie MediCheckKI Ihnen hilft
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="form-card reveal reveal-delay-1">
+        <div id="contactForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="name">Name <span class="req">*</span></label>
+              <input type="text" id="name" placeholder="Dr. Maria Müller" autocomplete="name" />
+              <span class="field-error" id="name-error">Bitte geben Sie Ihren Namen ein.</span>
+            </div>
+            <div class="form-group">
+              <label for="email">E-Mail <span class="req">*</span></label>
+              <input type="email" id="email" placeholder="m.mueller@praxis.de" autocomplete="email" />
+              <span class="field-error" id="email-error">Bitte geben Sie eine gültige E-Mail-Adresse ein.</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="phone">Telefon <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+              <input type="tel" id="phone" placeholder="+49 69 123456" autocomplete="tel" />
+            </div>
+            <div class="form-group">
+              <label for="practice">Praxisname / Institution <span class="req">*</span></label>
+              <input type="text" id="practice" placeholder="Internistische Praxis Müller" />
+              <span class="field-error" id="practice-error">Bitte geben Sie Ihren Praxisnamen ein.</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="pvs">Verwendetes PVS <span class="req">*</span></label>
+            <select id="pvs">
+              <option value="">Bitte wählen…</option>
+              <option value="cgm-albis">CGM Albis</option>
+              <option value="cgm-medistar">CGM Medistar</option>
+              <option value="medatixx">Medatixx</option>
+              <option value="tomedo">Tomedo (Zollsoft)</option>
+              <option value="m1pro">M1 Pro (CGM)</option>
+              <option value="turbomed">turbomed (CGM)</option>
+              <option value="insuite">inSuite (Doc Cirrus)</option>
+              <option value="medical-office">Medical Office</option>
+              <option value="other">Anderes / Unbekannt</option>
+            </select>
+            <span class="field-error" id="pvs-error">Bitte wählen Sie Ihr PVS aus.</span>
+          </div>
+          <div class="form-group">
+            <label for="message">Nachricht <span style="font-weight:400;color:var(--text-muted);">(optional)</span></label>
+            <textarea id="message" placeholder="Was beschäftigt Sie aktuell am meisten?"></textarea>
+          </div>
+          <div class="form-group">
+            <div class="checkbox-group">
+              <input type="checkbox" id="privacy" />
+              <label for="privacy" class="checkbox-label">
+                Ich habe die <a href="#datenschutz">Datenschutzerklärung</a> gelesen und
+                bin damit einverstanden, dass meine Daten zur Kontaktaufnahme verarbeitet werden. <span class="req">*</span>
+              </label>
+            </div>
+            <span class="field-error" id="privacy-error">Bitte stimmen Sie der Datenschutzerklärung zu.</span>
+          </div>
+          <button type="button" class="btn btn--primary form-submit" id="submitBtn">
+            Gespräch anfragen&nbsp;→
+          </button>
+        </div>
+        <div class="form-success" id="formSuccess">
+          <div class="success-icon">✓</div>
+          <h3>Anfrage erfolgreich gesendet!</h3>
+          <p>
+            Vielen Dank für Ihr Interesse. Wir melden uns innerhalb von
+            <strong>24 Stunden</strong> bei Ihnen, um einen passenden
+            Gesprächstermin zu vereinbaren.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <strong>MediCheck<span style="color:var(--amber);">KI</span></strong>
+    </div>
+    <div class="footer-links">
+      <a href="#impressum">Impressum</a>
+      <a href="#datenschutz">Datenschutz</a>
+      <a href="#contact">Kontakt</a>
+    </div>
+    <div class="footer-copy">© 2025 MediCheckKI – Frankfurt am Main</div>
+  </div>
+</footer>
+
+<script>
+  // ── Mobile Nav ──
+  const hamburger = document.getElementById('hamburger');
+  const mobileMenu = document.getElementById('mobileMenu');
+  hamburger.addEventListener('click', () => {
+    mobileMenu.classList.toggle('open');
+  });
+  document.querySelectorAll('.mobile-link').forEach(link => {
+    link.addEventListener('click', () => mobileMenu.classList.remove('open'));
+  });
+
+  // ── Scroll Reveal ──
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => observer.observe(el));
+
+  // ── Active Nav Highlight on Scroll ──
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.nav-links a');
+  window.addEventListener('scroll', () => {
+    const scrollY = window.scrollY;
+    sections.forEach(section => {
+      const top = section.offsetTop - 80;
+      const bottom = top + section.offsetHeight;
+      if (scrollY >= top && scrollY < bottom) {
+        navLinks.forEach(link => {
+          link.style.color = link.getAttribute('href') === '#' + section.id
+            ? 'var(--white)' : '';
+        });
+      }
+    });
+  }, { passive: true });
+
+  // ── Form Validation & Submit ──
+  function validateEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+  function setError(fieldId, errorId, show) {
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(errorId);
+    if (show) {
+      field.classList.add('error');
+      error.classList.add('visible');
+    } else {
+      field.classList.remove('error');
+      error.classList.remove('visible');
+    }
+  }
+
+  document.getElementById('submitBtn').addEventListener('click', () => {
+    const name     = document.getElementById('name').value.trim();
+    const email    = document.getElementById('email').value.trim();
+    const practice = document.getElementById('practice').value.trim();
+    const pvs      = document.getElementById('pvs').value;
+    const privacy  = document.getElementById('privacy').checked;
+
+    let valid = true;
+
+    if (!name)   { setError('name', 'name-error', true); valid = false; }
+    else           setError('name', 'name-error', false);
+
+    if (!validateEmail(email)) { setError('email', 'email-error', true); valid = false; }
+    else                         setError('email', 'email-error', false);
+
+    if (!practice) { setError('practice', 'practice-error', true); valid = false; }
+    else             setError('practice', 'practice-error', false);
+
+    if (!pvs)      { setError('pvs', 'pvs-error', true); valid = false; }
+    else             setError('pvs', 'pvs-error', false);
+
+    if (!privacy)  { setError('privacy', 'privacy-error', true); valid = false; }
+    else             setError('privacy', 'privacy-error', false);
+
+    if (valid) {
+      const btn = document.getElementById('submitBtn');
+      btn.textContent = 'Wird gesendet…';
+      btn.disabled = true;
+
+      const formData = new FormData();
+      formData.append('name',     name);
+      formData.append('email',    email);
+      formData.append('phone',    document.getElementById('phone').value.trim());
+      formData.append('practice', practice);
+      formData.append('pvs',      pvs);
+      formData.append('message',  document.getElementById('message').value.trim());
+
+      // ── FORMSPREE: Ersetze die URL unten mit deinem eigenen Endpoint ──
+      // 1. Gehe zu https://formspree.io → kostenlosen Account erstellen
+      // 2. Neues Formular anlegen (E-Mail: deniz.bektas@ymail.com)
+      // 3. Die generierte URL (z.B. https://formspree.io/f/xyzabcde) hier eintragen
+      fetch('https://formspree.io/f/DEINE_FORMULAR_ID', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(res => {
+        if (res.ok) {
+          document.getElementById('contactForm').style.display = 'none';
+          document.getElementById('formSuccess').classList.add('visible');
+          document.getElementById('contact').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          btn.textContent = 'Fehler – bitte erneut versuchen';
+          btn.disabled = false;
+        }
+      })
+      .catch(() => {
+        btn.textContent = 'Fehler – bitte erneut versuchen';
+        btn.disabled = false;
+      });
+    }
+  });
+
+  // ── Clear errors on input ──
+  ['name','email','practice'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      document.getElementById(id).classList.remove('error');
+      document.getElementById(id + '-error').classList.remove('visible');
+    });
+  });
+  document.getElementById('pvs').addEventListener('change', () => {
+    document.getElementById('pvs').classList.remove('error');
+    document.getElementById('pvs-error').classList.remove('visible');
+  });
+  document.getElementById('privacy').addEventListener('change', () => {
+    document.getElementById('privacy-error').classList.remove('visible');
+  });
+</script>
+</body>
+</html>
